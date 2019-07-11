@@ -13,8 +13,21 @@ class LyaSctr_MC():
         self.z_s         = z_s
         self.nu_star_z_s = self.calc_nu_star(z_s)
         self.nu_min      = self.nu_a + 0.1*self.nu_star_z_s
-        self.nof_R       = nof_R
-        self.R_all       = numpy.zeros([nof_nu_bins,nof_R]) * u.Mpc
+        if type(nof_R) == int:
+            self.nof_R       = [nof_R]*nof_nu_bins
+        elif type(nof_R) == list:
+            if len(nof_R) == nof_nu_bins:
+                self.nof_R = nof_R
+            else:
+                print('nof_R length should match nof_nu_bins, using 1000 Rs for each source redshift')
+                self.nof_R = [1000]*nof_nu_bins
+        else:
+            print('nof_R should be either an integer or a list (with length = nof_nu_bins), using 1000 Rs for each source redshift')
+            self.nof_R = [1000]*nof_nu_bins
+
+        self.max_nof_R = numpy.max(self.nof_R)
+        self.R_all       = -numpy.ones([nof_nu_bins,self.max_nof_R ]) * u.Mpc
+        self.absorption_zs = -numpy.ones([nof_nu_bins,self.max_nof_R ])
         self.R           = 0 * u.Mpc
         self.z           = z_s
         self.nof_nu_bins = nof_nu_bins
@@ -182,8 +195,8 @@ class LyaSctr_MC():
 
         self.get_nu_bins()
 
-        for bin_idx in tqdm(range(self.nof_nu_bins), desc='Bin'):
 
+        for bin_idx in tqdm(range(self.nof_nu_bins), desc='Bin'):
 
             self.nu_s   = self.nu_grid[bin_idx]
             self.tau_f1 = (self.nu_star_z_s/self.nu_a) * (self.nu_s / self.nu_a)**(3/2)
@@ -191,8 +204,8 @@ class LyaSctr_MC():
 
             v2_fill = self.nu1_grid[bin_idx]
 
-
-            for R_idx in range(self.nof_R):
+            curr_nof_R = self.nof_R[bin_idx]
+            for R_idx in range(curr_nof_R):
 
                 #initialize a new photon at z source, with R = 0 and the bin frequency
                 self.R  = 0 * u.Mpc
@@ -200,6 +213,8 @@ class LyaSctr_MC():
                 self.nu = self.nu_s
 
                 self.z_obs  = (1 + self.z)*self.nu_a/self.nu_s - 1
+                self.absorption_zs[bin_idx,R_idx] = self.z_obs
+                
                 high_tau = self.nu < self.nu_min
                 next_bin = self.nu < v2_fill
 
@@ -225,6 +240,7 @@ class LyaSctr_MC():
             final_itr = (bin_idx == (self.nof_nu_bins-1))
             if not final_itr:
                 self.R_all[bin_idx+1,:] = self.R_all[bin_idx,:].copy()
+
 
 
         return
