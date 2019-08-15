@@ -1,6 +1,6 @@
 from astropy import units as u
 from astropy import constants as const
-from astropy.cosmology import WMAP9 as cosmo
+from astropy.cosmology import Planck15 as cosmo
 import numpy
 from scipy.optimize import fsolve
 from tqdm import tqdm_notebook as tqdm
@@ -214,7 +214,7 @@ class LyaSctr_MC():
 
                 self.z_obs  = (1 + self.z)*self.nu_a/self.nu_s - 1
                 self.absorption_zs[bin_idx,R_idx] = self.z_obs
-                
+
                 high_tau = self.nu < self.nu_min
                 next_bin = self.nu < v2_fill
 
