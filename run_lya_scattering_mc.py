@@ -1,6 +1,6 @@
 import lya_scattering_mc_fast as lya
 import numpy
-from joblib import Parallel, delayed
+#from joblib import Parallel, delayed
 
 
 z_source_grid = numpy.arange(5,50)

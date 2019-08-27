@@ -3,6 +3,7 @@ from astropy import constants as const
 from astropy.cosmology import Planck15 as cosmo
 import numpy
 from numba import njit, prange
+from tqdm import  tqdm
 #from tqdm import tqdm_notebook as tqdm
 
 global nu_a, h, Om0, Ob0
@@ -72,7 +73,7 @@ class LyaSctr_MC():
         self.get_nu_bins()
 
 
-        for bin_idx in range(self.nof_nu_bins):
+        for bin_idx in tqdm(range(self.nof_nu_bins)):
 
             self.nu_s   = self.nu_grid[bin_idx]
             self.tau_f1 = (self.nu_star_z_s/self.nu_a) * (self.nu_s / self.nu_a)**(3/2)
