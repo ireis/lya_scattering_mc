@@ -22,7 +22,7 @@ def single_z_source(z, nof_nu_bins, nof_R):
 
 # The code returns -nof_R- radii in each of -nof_nu_bins- nu bins (the bins are between lyman alpha and lyman beta)
 # for a given redshift.
-if __name__ = '__main__':
+if __name__ == '__main__':
     nof_nu_bins = 5000
     nof_R = 5000
     save_to = '{}_nu_bins'.format(nof_nu_bins)
