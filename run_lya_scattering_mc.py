@@ -1,4 +1,4 @@
-import lya_scattering_mc as lya
+import lya_scattering_mc_fast as lya
 import numpy
 from joblib import Parallel, delayed
 
