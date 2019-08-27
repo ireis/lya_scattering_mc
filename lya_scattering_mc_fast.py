@@ -3,7 +3,7 @@ from astropy import constants as const
 from astropy.cosmology import Planck15 as cosmo
 import numpy
 from numba import njit, prange
-from tqdm import  tqdm
+#from tqdm import  tqdm
 #from tqdm import tqdm_notebook as tqdm
 
 global nu_a, h, Om0, Ob0
@@ -73,7 +73,7 @@ class LyaSctr_MC():
         self.get_nu_bins()
 
 
-        for bin_idx in tqdm(range(self.nof_nu_bins)):
+        for bin_idx in range(self.nof_nu_bins):
 
             self.nu_s   = self.nu_grid[bin_idx]
             self.tau_f1 = (self.nu_star_z_s/self.nu_a) * (self.nu_s / self.nu_a)**(3/2)
@@ -84,8 +84,12 @@ class LyaSctr_MC():
             curr_nof_R = self.nof_R[bin_idx]
             global_seed = numpy.random.randint(10000)
 
-            get_R_for_bin(self.R_all.value, bin_idx, self.absorption_zs, self.z_s, self.nu_s.value, self.nu_min.value, self.tau_f1, self.nu2_grid.value, curr_nof_R, v2_fill.value, global_seed)
+            R_bin_vals = numpy.zeros(curr_nof_R)
 
+            z_obs = get_R_for_bin(R_bin_vals, self.R_all.value, bin_idx, self.z_s, self.nu_s.value, self.nu_min.value, self.tau_f1, self.nu2_grid.value, curr_nof_R, v2_fill.value, global_seed)
+
+            self.absorption_zs[bin_idx,:] = z_obs
+            self.R_all[bin_idx] = R_bin_vals*u.Mpc
 
             final_itr = (bin_idx == (self.nof_nu_bins-1))
             if not final_itr:
@@ -95,10 +99,13 @@ class LyaSctr_MC():
 
         return
 
-@njit(parallel=True)
-def get_R_for_bin(R_all, bin_idx, absorption_zs, z_s, nu_s, nu_min, tau_f1, nu2_grid, curr_nof_R, v2_fill, global_seed):
+@njit
+def get_R_for_bin(R_bin, R_all, bin_idx, z_s, nu_s, nu_min, tau_f1, nu2_grid, curr_nof_R, v2_fill, global_seed):
     seed = global_seed
-    for R_idx in prange(curr_nof_R):
+
+    z_obs  = (1 + z_s)*nu_a/nu_s - 1
+
+    for R_idx in range(curr_nof_R):
         numpy.random.seed(seed)
         seed = seed + 1
 
@@ -106,9 +113,6 @@ def get_R_for_bin(R_all, bin_idx, absorption_zs, z_s, nu_s, nu_min, tau_f1, nu2_
         R  = 0
         z  = z_s
         nu = nu_s
-
-        z_obs  = (1 + z)*nu_a/nu_s - 1
-        absorption_zs[bin_idx,R_idx] = z_obs
 
         high_tau = nu < nu_min
         next_bin = nu < v2_fill
@@ -118,18 +122,18 @@ def get_R_for_bin(R_all, bin_idx, absorption_zs, z_s, nu_s, nu_min, tau_f1, nu2_
             nu, z, R = low_tau_sctr(nu, z, R, z_obs, tau_f1)
 
             # check if the photon reached the end of its path
-            # or swithced to the frequence of the next/prev bin
+            # or swithced to the frequency of the next/prev bin
             high_tau = nu < nu_min
             next_bin = nu < v2_fill
 
 
         if high_tau:
-            R_all[bin_idx,R_idx] = high_tau_sctr(nu, z, R)
+            R_bin[R_idx] = high_tau_sctr(nu, z, R)
         elif next_bin:
             curr_bin = numpy.min(numpy.where(nu < nu2_grid)[0])
             R_to_end = numpy.random.choice(R_all[curr_bin,:]) # *u.Mpc
-            R_all[bin_idx,R_idx] = calc_full_R(R_to_end, R)
-    return
+            R_bin[R_idx] = calc_full_R(R_to_end, R)
+    return z_obs
 
 
 @njit
