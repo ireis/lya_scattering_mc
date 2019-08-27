@@ -95,7 +95,7 @@ class LyaSctr_MC():
 
         return
 
-@njit
+@njit(parallel=True)
 def get_R_for_bin(R_all, bin_idx, absorption_zs, z_s, nu_s, nu_min, tau_f1, nu2_grid, curr_nof_R, v2_fill, global_seed):
     seed = global_seed
     for R_idx in prange(curr_nof_R):
