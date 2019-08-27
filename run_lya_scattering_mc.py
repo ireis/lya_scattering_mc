@@ -24,4 +24,7 @@ def single_z_source(z):
 # The code returns -nof_R- radii in each of -nof_nu_bins- nu bins (the bins are between lyman alpha and lyman beta)
 # for a given redshift.
 
-Parallel(n_jobs=1)(delayed(single_z_source)(z) for z in z_source_grid)
+#Parallel(n_jobs=1)(delayed(single_z_source)(z) for z in z_source_grid)
+
+for z in z_source_grid:
+    single_z_source(z)
