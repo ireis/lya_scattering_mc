@@ -17,9 +17,8 @@ def bin_photons(mc_results_path):
     z_bins = numpy.arange(4, 50, 0.1) + delta
     z_bins_mean = (z_bins[1:]+z_bins[:-1])/2
 
-    log_r_bins = numpy.linspace(0, 4, 100)
-    delta = log_r_bins[1]
-    log_r_grid = numpy.linspace(0, 4, 100)[:-1] + delta
+    log_r_bins = numpy.log10(numpy.linspace(0.0001, 1000, 200))
+    log_r_grid = (log_r_bins[1:] + log_r_bins[:-1])/2
 
     fraction_of_photons_observed_all_z_source = numpy.zeros([len(z_grid) ,len(log_r_bins)-1, len(z_bins)-1])
 
@@ -42,13 +41,12 @@ def bin_photons(mc_results_path):
         fraction_of_photons_observed_all_z_source[z_source_ind] = fraction_of_photons_observed
     return z_bins_mean, log_r_grid, z_grid, fraction_of_photons_observed_all_z_source
 
-
 def get_F(x, y, z):
 
     f = interp2d(x,y,z, kind='cubic')
 
 
-    xmin, xmax = 0.1, 1000
+    xmin, xmax = 0.0001, 1000
     X = numpy.log10(numpy.linspace(xmin, xmax, 900))
 
     ymin, ymax = 5, 50
@@ -79,12 +77,18 @@ def get_F(x, y, z):
 
         else:
             F[i] = 0
-    return F
+    return X,Y,F
 
 
 def get_photon_fraction(mc_results_path, output_path):
 
-    z_bins_mean, log_r_grid, z_grid, fraction_of_photons_observed_all_z_source = bin_photons(mc_results_path)
+    binned_nof_photons_path = '{}binned_data.npy'.format(mc_results_path)
+    try:
+        z_bins_mean, log_r_grid, z_grid, fraction_of_photons_observed_all_z_source = numpy.load(binned_nof_photons_path)
+    except:
+        z_bins_mean, log_r_grid, z_grid, fraction_of_photons_observed_all_z_source = bin_photons(mc_results_path)
+        numpy.save(binned_nof_photons_path, [z_bins_mean, log_r_grid, z_grid, fraction_of_photons_observed_all_z_source])
+
     lya_scattered_photon_r_dist = numpy.zeros([fraction_of_photons_observed_all_z_source.shape[0], fraction_of_photons_observed_all_z_source.shape[1]])
     z_simul = numpy.arange(5,50)
     for z in tqdm(z_simul):
