@@ -2,7 +2,7 @@
 
 The output is the distribution of distances at which photons are absorbed (with Lyman alpha frequency), given the frequency and redshift at which they were emitted.
 
-![distance_distribution_zaze_s](zaze_20_205.png)
+![distance_distribution_zaze_s](zaze_20_216.png)
 
 ![distance_distribution_fop](fop.png)
 
