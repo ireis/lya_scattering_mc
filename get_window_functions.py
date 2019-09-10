@@ -57,8 +57,16 @@ def R_to_zshell(R, z, k=k):
     return zshell
 
 
+global r_grid, r_cube
+za_grid = numpy.load('/Volumes/Backup/Cosmo/distance_distribution/dense_z_source_1000_nu_bins_20000_r/z_absorb_grid.npy')
+ze_grid = numpy.load('/Volumes/Backup/Cosmo/distance_distribution/dense_z_source_1000_nu_bins_20000_r/z_source_grid.npy')
 
+p = '/Volumes/Backup/Cosmo/distance_distribution/dense_z_source_1000_nu_bins_20000_r/'
 
+Rzero = 1e-30
+r_grid = numpy.linspace(Rzero, 1000, 300)
+r_grid = (r_grid[1:] + r_grid[:-1])/2
+#r_grid = r_grid[1:]
 
 def get_r_zaze(p, za, ze):
     za_ind = numpy.argmin(abs(za - za_grid))
@@ -71,10 +79,29 @@ def get_r_zaze(p, za, ze):
 
 
 
+N = 128
+mid_cube = float(N)/2
+Lpix = 3
+real_space_window = numpy.zeros([N,N,N])
+
+x = numpy.arange(N) - mid_cube
+y = numpy.arange(N) - mid_cube
+z = numpy.arange(N) - mid_cube
+
+r_cube = numpy.sqrt(x[:,None,None]**2 + y[None,:,None]**2 + z[None,None,:]**2)*Lpix
+
+p = '/Volumes/Backup/Cosmo/distance_distribution/dense_z_source_1000_nu_bins_20000_r/'
+
+
+za_, ze_, r_zaze = get_r_zaze(p, 20, 10)
+
 @njit
 def get_fraction_of_photons(r, r_zaze):
-    loc = numpy.argmin(numpy.abs(r_grid - r))
-    r_for_v = r_grid[loc]
+    #loc = numpy.argmin(numpy.abs(r_grid - r))
+    loc = numpy.argmax(r_grid > r)
+    r_for_v = r#r_grid[loc]
+    if r_for_v < 1:
+        r_for_v = 1
     fop = r_zaze[loc]
     fop_per_v = fop/r_for_v**2
     return fop_per_v
@@ -112,32 +139,18 @@ def get_real_space_window(real_space_window, r_zaze, N):
 
 
 
+import os.path
 
 
 if __name__ == '__main__':
 
-    p_window = '/scratch300/itamarreis/git/poisson_21cm/IC_and_backgrounds/lya_window_functions_py/'
+
+
+    p_window = '/Volumes/Backup/Cosmo/IC_and_backgrouds_py/lya_window_functions/'
+    p_window =  '/scratch300/itamarreis/git/poisson_21cm/IC_and_backgrounds/lya_window_functions_py/''
     z_simul = numpy.arange(5,41)
+
     Rshell_grid, Rmin, Rmax, nof_shells = get_Rshell_grid()
-
-
-    global r_grid, r_cube
-
-    N = 128
-    mid_cube = float(N)/2
-    Lpix = 3
-    real_space_window = numpy.zeros([N,N,N])
-
-
-    x = numpy.arange(N) - mid_cube
-    y = numpy.arange(N) - mid_cube
-    z = numpy.arange(N) - mid_cube
-
-    r_cube = numpy.sqrt(x[:,None,None]**2 + y[None,:,None]**2 + z[None,None,:]**2)*Lpix
-
-
-
-
 
 
     for z_center in z_simul:
@@ -146,12 +159,20 @@ if __name__ == '__main__':
         print(z_center)
         for ri in trange(nof_shells):
             r_shell = Lpix*(Rmax[ri] + Rmin[ri])/2
-            z_shell = R_to_zshell(r_shell, z_center)
-            za_, ze_, r_zaze = get_r_zaze(p, z_center, z_shell)
-            real_space_window = numpy.zeros([N,N,N])
-            get_real_space_window(real_space_window, r_zaze, N)
-            real_space_window = real_space_window/numpy.sum(real_space_window)
-            shifted_real_space_window = numpy.fft.ifftshift(real_space_window)
-            k_space_window = numpy.fft.fftn(shifted_real_space_window)
-            m_dict = {'windowk':k_space_window}
-            savemat('{}za_{}_R_{:.4f}.mat'.format(p_window, za, r_shell), m_dict)
+            fname = '{}za_{}_R_{:.4f}.mat'.format(p_window, z_center, r_shell)
+            if os.path.isfile('XXX' + fname):
+                pass
+            else:
+                z_shell = R_to_zshell(r_shell, z_center)
+                za_, ze_, r_zaze = get_r_zaze(p, z_center, z_shell)
+                real_space_window = numpy.zeros([N,N,N])
+                get_real_space_window(real_space_window, r_zaze, N)
+                norm = numpy.sum(real_space_window)
+                if norm > 1: # The normalization should be big
+                    real_space_window = real_space_window/norm
+                else:
+                    real_space_window = numpy.zeros([N,N,N])
+                shifted_real_space_window = numpy.fft.ifftshift(real_space_window)
+                k_space_window = numpy.real(numpy.fft.fftn(shifted_real_space_window))
+                m_dict = {'windowk':k_space_window}
+                savemat(fname, m_dict, do_compression=True)
