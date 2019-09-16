@@ -49,7 +49,7 @@ def initial_guess(x, y, dy, za, ze):
     alpha = (lr_cut_data - lr_max)/3
     beta2 = (lr_cut_data - lr_max)
 
-    pred_max = m*(lr_max-lr_min)*( 1 / (1 + numpy.exp(  ((lr_max - lr_cut)/(0.5*alpha))   )) )
+    pred_max = m*(lr_max)*( 1 / (1 + numpy.exp(  ((lr_max - lr_cut)/(0.5*alpha))   )) ) - m*lr_min
 
     bst = (max_val - pred_max)
     #if bst < 0:
@@ -67,18 +67,14 @@ def distdist_model(lr_min, m, beta1, beta2 ,lr_max, bst, za, ze, lr):
 
     c = numpy.zeros(lr.shape)
     lr_cut = numpy.log10(6 / (cosmo.h * (cosmo.Om0)**(0.5)) * (1/numpy.sqrt(1 + za) - 1/numpy.sqrt(1 + ze)) * 1000)
-    #l1 =  numpy.where(lr > lr_max)[0]
-    #l2 =  numpy.where(lr <= lr_max)[0]
+
     c = m*(lr-lr_min)*( 1 / (1 + numpy.exp(  ((lr - lr_max)/(0.5*beta1))   )) )**2
-    #c[l2] = m*(lr[l2]-lr_min)#*( 1 / (1 + numpy.exp(  ((lr[l2] - lr_max)/(0.5*beta1))   )) )
+    #c = m*(lr)*( 1 / (1 + numpy.exp(  ((lr - lr_max)/(0.5*beta1))   )) )**2
+    #c = c - m*lr_min
 
-    #c_cut = m*(lr_a-lr_min)*( 1 / (1 + numpy.exp((lr_a - lr_max)/(0.5*beta1))) )
     c = c + bst*numpy.exp( -(lr-(lr_max-beta1))**2/(2*beta2**2))
-    loc = numpy.where(lr > lr_cut)[0]
-    if loc.size > 0:
-        c[loc] = 0
-    c[lr > lr_cut] = 0
 
+    c[lr > lr_cut] = 0
 
     c[lr < lr_min] = 0
 
@@ -206,12 +202,12 @@ def plot_res(lr_min, m, alpha, beta2, lr_max, bst, bins, log_counts, d_log_count
         plt.savefig(save_to)
     plt.show()
 
-def plot_res_res(lr_min, m, alpha, beta2, lr_max, bst, bins, log_counts, d_log_counts, za, ze, save_to=None):
+def plot_res_res(lr_min, m, alpha, beta2, lr_max, bst, bins, log_counts, d_log_counts, za, ze, red = 0, save_to=None):
 
     lr_cut = numpy.log10(6 / (cosmo.h * (cosmo.Om0)**(0.5)) * (1/numpy.sqrt(1 + za) - 1/numpy.sqrt(1 + ze)) * 1000)
 
     lr_grid = numpy.linspace(numpy.min(bins),  numpy.max(bins), 1000)
-    ddm = distdist_model(lr_min, m, alpha, beta2, lr_max, bst, za, ze, lr_grid)
+    ddm = distdist_model(lr_min, m, alpha, beta2, lr_max, bst, za, ze, lr_grid) - red
     fig = plt.figure(figsize = (15,7))
     ax1 = fig.add_axes((.1,.3,.8,.6))
     fs = 25
@@ -230,7 +226,7 @@ def plot_res_res(lr_min, m, alpha, beta2, lr_max, bst, bins, log_counts, d_log_c
     plt.legend(fontsize = fs-5, loc = 'upper left')
     xlim = plt.gca().get_xlim()
     ax2 = fig.add_axes((.1,.1,.8,.2))
-    ddm_bins = distdist_model(lr_min, m, alpha, beta2, lr_max, bst, za, ze, bins)
+    ddm_bins = distdist_model(lr_min, m, alpha, beta2, lr_max, bst, za, ze, bins) - red
     markers, caps, bars = plt.errorbar(bins, log_counts - ddm_bins, xerr = None, yerr =d_log_counts,  color = 'k', fmt='.', ms = 12, label = 'Residuals',capsize = 3, capthick=1, zorder=1)
     [bar.set_alpha(0.3) for bar in bars]
     [cap.set_alpha(0.3) for cap in caps]
@@ -252,7 +248,7 @@ def fit_all(mc_results_path):
     ze_grid = numpy.load('{}z_source_grid.npy'.format(mc_results_path))
 
     dza = 0.025
-    z_simul = numpy.arange(5,41)
+    z_simul = numpy.arange(21,41)
     #z_simul = numpy.arange(35,36)
 
     Rshell_grid, Rmin, Rmax, nof_shells = get_Rshell_grid()
@@ -266,6 +262,7 @@ def fit_all(mc_results_path):
         beta_arr = numpy.zeros(nof_shells)*numpy.nan
         rshell_arr = numpy.zeros(nof_shells)*numpy.nan
         zshell_arr = numpy.zeros(nof_shells)*numpy.nan
+        dists_arr = numpy.zeros(nof_shells)*numpy.nan
         zcenter_df = pandas.DataFrame()
         for shell_ind in trange(nof_shells):
             r_shell = Lpix*(Rmax[shell_ind] + Rmin[shell_ind])/2
@@ -276,7 +273,7 @@ def fit_all(mc_results_path):
 
             dists = get_photons_za_ze(mc_results_path, za, ze, dza)
             nof_dists = len(dists)
-            #print(nof_dists)
+            dists_arr[shell_ind] = nof_dists
             if nof_dists > 10000:
                 try:
                     bins, log_counts, d_log_counts = get_log_log_data(dists)
@@ -296,6 +293,7 @@ def fit_all(mc_results_path):
                     beta_arr[shell_ind] = beta
                     rshell_arr[shell_ind] = r_shell
                     zshell_arr[shell_ind] = z_shell
+
                 except:
                     print('Fail at shell {}, zcenter {}'.format(shell_ind, z_center))
         zcenter_df['m'] = m_arr
@@ -306,6 +304,7 @@ def fit_all(mc_results_path):
         zcenter_df['bst'] = bst_arr
         zcenter_df['r_shell'] = rshell_arr
         zcenter_df['z_shell'] = zshell_arr
+        zcenter_df['nof_dists'] = dists_arr
 
         zcenter_df.to_csv('fitting_results_v3/za_dfs/za_{}_df.csv'.format(z_center))
 

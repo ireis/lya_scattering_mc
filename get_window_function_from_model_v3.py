@@ -19,33 +19,40 @@ def polyjit(ps, x):
 
 
 #@njit
-def distdist_model(m, beta1, beta2 ,lr_max, bst, za, ze, lr):
+def distdist_model(lr_min, m, beta1, beta2 ,lr_max, bst, za, ze, lr):
 
-    red_factor = 1e-6
-    c = numpy.zeros(lr.shape)
+    #red_factor = 1e-6
     lr_cut = numpy.log10(6 / (cosmo.h * (cosmo.Om0)**(0.5)) * (1/numpy.sqrt(1 + za) - 1/numpy.sqrt(1 + ze)) * 1000)
 
-    c = red_factor*m*(lr)*( 1 / (1 + numpy.exp(  ((lr - lr_max)/(0.5*beta1))   )) )**2
-    c = c + red_factor*bst*numpy.exp( -(lr-(lr_max-beta1))**2/(2*beta2**2))
+    if lr > lr_cut:
+        c = 0
+    else:
+        c = m*(lr-lr_min)*( 1 / (1 + numpy.exp(  ((lr - lr_max)/(0.5*beta1))   )) )**2
+        c = c + bst*numpy.exp( -(lr-(lr_max-beta1))**2/(2*beta2**2))
 
-    c[lr > lr_cut] = numpy.nan
-    c[c < 0] = 0
+
 
     return c
 
 #@njit
-def get_fraction_of_photons(r, lr_min, gamma, alpha ,lr_max, lr_cut):
+def get_fraction_of_photons(r, lr_min, gamma, alpha, beta ,lr_max, bst, za, ze):
 
 
     if r < 3:
         r = 3
     lr = numpy.log10(r)
-    if lr < lr_min:
-        nof_photons = 0
-        nof_photons_per_volume = 0
-    else:
-        nof_photons = (1/r)*10**(distdist_model(lr_min, gamma, alpha ,lr_max, lr_cut, lr))
+
+    log_nof_photons = distdist_model(lr_min, gamma, alpha, beta, lr_max, bst, za, ze, lr)
+    if log_nof_photons > 0:
+        nof_photons = (1/r)*10**(log_nof_photons)
         nof_photons_per_volume = nof_photons/r**2
+    else:
+        if lr > lr_min+0.05:
+            nof_photons = 0
+            nof_photons_per_volume = 0
+        else:
+            nof_photons = (1/r)*10**(log_nof_photons)
+            nof_photons_per_volume = nof_photons/r**2
 
 
     return nof_photons_per_volume
@@ -53,9 +60,13 @@ def get_fraction_of_photons(r, lr_min, gamma, alpha ,lr_max, lr_cut):
 
 
 #@njit
-def get_real_space_window(real_space_window, N, rshell, lr_cut):
+def get_real_space_window(real_space_window, N, rshell, za, ze):
+
+    lr_cut = numpy.log10(6 / (cosmo.h * (cosmo.Om0)**(0.5)) * (1/numpy.sqrt(1 + za) - 1/numpy.sqrt(1 + ze)) * 1000)
 
     r_cut = 10**(lr_cut)
+
+
     pjit = numpy.zeros(5)
     pjit[-len(r_min_poly):] = r_min_poly
     r_min = polyjit(pjit, rshell)
@@ -79,7 +90,16 @@ def get_real_space_window(real_space_window, N, rshell, lr_cut):
     pjit = numpy.zeros(5)
     pjit[-len(alpha_poly):] = alpha_poly
     alpha = polyjit(pjit, rshell)
-    print('r_min = {:.1f}, gamma = {:.1f}, alpha = {:.1f}, r_max = {:.1f}, r_cut = {:.1f}'.format(r_min, gamma, alpha ,r_max, r_cut))
+
+    pjit = numpy.zeros(5)
+    pjit[-len(beta_poly):] = beta_poly
+    beta = polyjit(pjit, rshell)
+
+
+    pjit = numpy.zeros(5)
+    pjit[-len(bst_poly):] = bst_poly
+    bst = polyjit(pjit, rshell)
+    print('lr_min = {:.1f}, gamma = {:.1f}, alpha = {:.1f}, beta = {:.1f}, r_max = {:.1f}, r_cut = {:.1f}, bst = {:.1f}'.format(lr_min, gamma, alpha, beta ,r_max, r_cut, bst ))
 
 
     mid = int(N/2) + 1
@@ -87,7 +107,7 @@ def get_real_space_window(real_space_window, N, rshell, lr_cut):
         for yi in range(mid):
             for zi in range(mid):
                 if (xi >= yi) and (yi >= zi):
-                    res = get_fraction_of_photons(r_cube[xi,yi,zi], lr_min, gamma, alpha ,lr_max, lr_cut)
+                    res = get_fraction_of_photons(r_cube[xi,yi,zi], lr_min, gamma, alpha, beta ,lr_max, bst, za, ze)
 
                     xit =  - xi
                     yit =  - yi
@@ -163,13 +183,16 @@ if __name__ == '__main__':
 
     r_cube = numpy.sqrt(x[:,None,None]**2 + y[None,:,None]**2 + z[None,None,:]**2)*Lpix
 
-    z_simul = numpy.arange(5,10)
+    z_simul = numpy.arange(40,41)
 
     for z_center in z_simul:
         alpha_poly = numpy.load('fitting_results_v3/alphas/alpha_poly_za_{}.npy'.format(z_center))
         gamma_poly = numpy.load('fitting_results_v3/gammas/gamma_poly_za_{}.npy'.format(z_center))
-        r_max_poly = numpy.load('fitting_results_v3/rmaxs/rmax_poly_za_{}.npy'.format(z_center))
         r_min_poly = numpy.load('fitting_results_v3/rmins/rmin_poly_za_{}.npy'.format(z_center))
+        r_max_poly = numpy.load('fitting_results_v3/rmaxs/rmax_poly_za_{}.npy'.format(z_center))
+        beta_poly = numpy.load('fitting_results_v3/betas/beta_poly_za_{}.npy'.format(z_center))
+        bst_poly = numpy.load('fitting_results_v3/bsts/bst_poly_za_{}.npy'.format(z_center))
+
         print(z_center)
         za = z_center
         for ri in range(nof_shells):
@@ -185,10 +208,10 @@ if __name__ == '__main__':
                 lr_cut = numpy.log10(6 / (cosmo.h * (cosmo.Om0)**(0.5)) * (1/numpy.sqrt(1 + za) - 1/numpy.sqrt(1 + ze)) * 1000)
 
                 real_space_window = numpy.zeros([N,N,N])
-                get_real_space_window(real_space_window, N, r_shell, lr_cut)
+                get_real_space_window(real_space_window, N, r_shell, za, ze)
                 real_space_window[numpy.isnan(real_space_window)] = 0
                 norm = numpy.sum(real_space_window)
-                print('{:.2f}, {:.2f}'.format(z_shell, norm))
+                print('{}, {:.2f}, {:.2f}'.format(ri, z_shell, norm))
                 if norm > 0.000001:
                     real_space_window = real_space_window/norm
                 else:
