@@ -37,22 +37,32 @@ def distdist_model(lr_min, m, beta1, beta2 ,lr_max, bst, za, ze, lr):
 #@njit
 def get_fraction_of_photons(r, lr_min, gamma, alpha, beta ,lr_max, bst, za, ze):
 
+    r_res = 3
+    lr_res = numpy.log10(r_res)
+    lr_cut = numpy.log10(6 / (cosmo.h * (cosmo.Om0)**(0.5)) * (1/numpy.sqrt(1 + za) - 1/numpy.sqrt(1 + ze)) * 1000)
 
-    if r < 3:
-        r = 3
-    lr = numpy.log10(r)
 
-    log_nof_photons = distdist_model(lr_min, gamma, alpha, beta, lr_max, bst, za, ze, lr)
-    if log_nof_photons > 0:
-        nof_photons = (1/r)*10**(log_nof_photons)
-        nof_photons_per_volume = nof_photons/r**2
-    else:
-        if lr > lr_min+0.05:
-            nof_photons = 0
-            nof_photons_per_volume = 0
+    if (lr_max <= lr_res) or (lr_cut <= lr_res):
+        if r <= r_res:
+            return 1
         else:
+            return 0
+    else:
+        if r < 1:
+            r = 1
+        lr = numpy.log10(r)
+
+        log_nof_photons = distdist_model(lr_min, gamma, alpha, beta, lr_max, bst, za, ze, lr)
+        if log_nof_photons > 0:
             nof_photons = (1/r)*10**(log_nof_photons)
             nof_photons_per_volume = nof_photons/r**2
+        else:
+            if lr > lr_min+0.05:
+                nof_photons = 0
+                nof_photons_per_volume = 0
+            else:
+                nof_photons = (1/r)*10**(log_nof_photons)
+                nof_photons_per_volume = nof_photons/r**2
 
 
     return nof_photons_per_volume
@@ -79,7 +89,7 @@ def get_real_space_window(real_space_window, N, rshell, za, ze):
     r_max = polyjit(pjit, rshell)
     if r_max > r_cut:
         r_max = r_cut
-    if r_max < r_min:
+    if r_max <= r_min:
         r_max = r_cut
     lr_max = numpy.log10(r_max)
 
@@ -183,7 +193,7 @@ if __name__ == '__main__':
 
     r_cube = numpy.sqrt(x[:,None,None]**2 + y[None,:,None]**2 + z[None,None,:]**2)*Lpix
 
-    z_simul = numpy.arange(40,41)
+    z_simul = numpy.arange(5,41)
 
     for z_center in z_simul:
         alpha_poly = numpy.load('fitting_results_v3/alphas/alpha_poly_za_{}.npy'.format(z_center))
