@@ -30,14 +30,10 @@ def single_z_source(z, nof_nu_bins, nof_R):
 # The code returns -nof_R- radii in each of -nof_nu_bins- nu bins (the bins are between lyman alpha and lyman beta)
 # for a given redshift.
 if __name__ == '__main__':
-<<<<<<< Updated upstream
-    nof_nu_bins = 5000
-=======
-    nof_nu_bins = 2000
->>>>>>> Stashed changes
-    nof_R = 5000
-    save_to = 'dense_z_source_{}_nu_bins_5000_r'.format(nof_nu_bins)
-    z_source_grid = numpy.arange(5,50,0.1)
+    nof_nu_bins = 1000
+    nof_R = 50000
+    save_to = 'dense_z_source_{}_nu_bins_{}_r'.format(nof_nu_bins, nof_R)
+    z_source_grid = numpy.arange(20,40,0.1)
     numpy.save('{}/z_source_grid'.format(save_to), z_source_grid)
     Parallel(n_jobs=-1, verbose=10)(delayed(single_z_source)(z, nof_nu_bins, nof_R) for z in z_source_grid)
 
